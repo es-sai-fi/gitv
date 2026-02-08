@@ -100,8 +100,9 @@ impl App {
             .get()
             .unwrap()
             .inner()
-            .issues(state.owner, state.repo);
-        let issue_list = IssueList::new(issue_handler).await;
+            .issues(state.owner.clone(), state.repo.clone());
+        let issue_list =
+            IssueList::new(issue_handler, state.owner, state.repo, action_tx.clone()).await;
         Ok(Self {
             focus: None,
             action_tx,

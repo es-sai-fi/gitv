@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use octocrab::{
     Page,
@@ -7,62 +9,73 @@ use octocrab::{
 use rat_widget::{event::HandleEvent, focus::HasFocus, list::selection::RowSelection};
 use ratatui::{
     buffer::Buffer,
+    layout::Rect,
     style::{Modifier, Style, Stylize},
     symbols,
     widgets::{Block, ListItem, Padding, StatefulWidget},
 };
 use ratatui_macros::{line, span};
 use textwrap::{Options, wrap};
+use throbber_widgets_tui::ThrobberState;
 
 use crate::{
     app::GITHUB_CLIENT,
     errors::AppError,
-    ui::{components::Component, layout::Layout},
+    ui::{Action, components::Component, layout::Layout},
 };
 
 pub struct IssueList<'a> {
     pub issues: Vec<IssueListItem>,
-    pub page: Page<Issue>,
+    pub page: Option<Page<Issue>>,
     pub list_state: rat_widget::list::ListState<RowSelection>,
     pub handler: IssueHandler<'a>,
     pub action_tx: Option<tokio::sync::mpsc::Sender<crate::ui::Action>>,
+    pub throbber_state: ThrobberState,
     state: State,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 enum State {
-    Loading,
     #[default]
+    Loading,
     Loaded,
 }
 
 impl<'a> IssueList<'a> {
-    pub async fn new(handler: IssueHandler<'a>) -> Self {
-        let page = handler
-            .list()
-            .page(1_u32)
-            .per_page(10u8)
-            .send()
-            .await
-            .unwrap();
-        let issues = page.clone().items;
-
+    pub async fn new(
+        handler: IssueHandler<'a>,
+        owner: String,
+        repo: String,
+        tx: tokio::sync::mpsc::Sender<Action>,
+    ) -> Self {
+        tokio::spawn(async move {
+            let p = GITHUB_CLIENT
+                .get()
+                .unwrap()
+                .inner()
+                .issues(owner, repo)
+                .list()
+                .page(1_u32)
+                .per_page(10u8)
+                .send()
+                .await
+                .unwrap();
+            tx.send(Action::NewPage(p)).await.unwrap();
+        });
         Self {
-            page,
+            page: None,
+            throbber_state: ThrobberState::default(),
             action_tx: None,
-            issues: issues.into_iter().map(IssueListItem::from).collect(),
+            issues: vec![],
             list_state: rat_widget::list::ListState::default(),
             handler,
-            state: State::Loaded,
+            state: State::default(),
         }
     }
     pub fn render(&mut self, area: Layout, buf: &mut Buffer) {
-        let mut block = Block::bordered()
+        let block = Block::bordered()
             .border_type(ratatui::widgets::BorderType::Rounded)
             .padding(Padding::horizontal(3));
-        if self.state == State::Loading {
-            block = block.title("Loading...");
-        }
         let list = rat_widget::list::List::<RowSelection>::new(
             self.issues.iter().map(Into::<ListItem>::into),
         )
@@ -70,6 +83,20 @@ impl<'a> IssueList<'a> {
         .style(Style::default())
         .select_style(Style::default().add_modifier(Modifier::BOLD));
         list.render(area.main_content, buf, &mut self.list_state);
+        if self.state == State::Loading {
+            let title_area = Rect {
+                x: area.main_content.x + 1,
+                y: area.main_content.y,
+                width: 10,
+                height: 1,
+            };
+            let full = throbber_widgets_tui::Throbber::default()
+                .label("Loading")
+                .style(ratatui::style::Style::default().fg(ratatui::style::Color::Cyan))
+                .throbber_set(throbber_widgets_tui::BRAILLE_SIX_DOUBLE)
+                .use_type(throbber_widgets_tui::WhichUse::Spin);
+            full.render(title_area, buf, &mut self.throbber_state);
+        }
     }
 }
 
@@ -112,13 +139,12 @@ impl From<&IssueListItem> for ListItem<'_> {
                     }
                 }),
                 "  ",
-                span!("Opened by {}", value.0.user.login).dim(),
-                " ",
                 span!(
-                    "Created at {}",
+                    "Opened by {} at {}",
+                    value.0.user.login,
                     value.0.created_at.format("%Y-%m-%d %H:%M:%S")
                 )
-                .dim()
+                .dim(),
             ],
             line!["   ", span!(body.join(" ")).style(Style::new().dim())],
         ];
@@ -137,15 +163,22 @@ impl Component for IssueList<'_> {
     }
     async fn handle_event(&mut self, event: crate::ui::Action) {
         match event {
+            crate::ui::Action::Tick => {
+                if self.state == State::Loading {
+                    self.throbber_state.calc_next();
+                }
+            }
             crate::ui::Action::AppEvent(ref event) => {
                 if let rat_widget::event::Outcome::Changed =
                     self.list_state.handle(event, rat_widget::event::Regular)
                 {
                     let selected = self.list_state.selected_checked();
                     if let Some(selected) = selected {
-                        if selected == self.issues.len() - 1 {
+                        if selected == self.issues.len() - 1
+                            && let Some(page) = &self.page
+                        {
                             let tx = self.action_tx.as_ref().unwrap().clone();
-                            let page_next = self.page.next.clone();
+                            let page_next = page.next.clone();
                             self.state = State::Loading;
                             tokio::spawn(async move {
                                 let p = GITHUB_CLIENT
@@ -178,7 +211,7 @@ impl Component for IssueList<'_> {
                     .map(IssueListItem::from);
                 let prev_issues = std::mem::take(&mut self.issues);
                 self.issues = prev_issues.into_iter().chain(issues).collect();
-                self.page = p;
+                self.page = Some(p);
                 self.state = State::Loaded;
             }
             _ => {}
