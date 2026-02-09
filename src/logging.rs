@@ -1,5 +1,9 @@
 use tracing_error::ErrorLayer;
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{
+    fmt::{self},
+    layer::SubscriberExt,
+    util::SubscriberInitExt,
+};
 
 use crate::errors::AppError;
 
@@ -12,9 +16,10 @@ pub fn init() -> Result<(), AppError> {
         .with_writer(log_file)
         .with_target(true)
         .with_ansi(false);
-    tracing_subscriber::registry()
+    let s = tracing_subscriber::registry()
         .with(file_subscriber)
         .with(ErrorLayer::default())
         .try_init()?;
+
     Ok(())
 }

@@ -5,6 +5,7 @@ use crate::{
     errors::AppError,
     ui::components::{
         Component, DumbComponent,
+        issue_conversation::IssueConversation,
         issue_detail::IssuePreview,
         issue_list::{IssueList, MainScreen},
         label_list::LabelList,
@@ -19,15 +20,19 @@ use octocrab::{
     models::{Label, issues::Issue},
 };
 use rat_widget::{
-    event::{HandleEvent, Regular},
+    event::{HandleEvent, Outcome, Regular},
     focus::{Focus, FocusBuilder},
 };
 use ratatui::{crossterm, prelude::*, widgets::Block};
 use termprofile::{DetectorSettings, TermProfile};
 use tokio::{select, sync::mpsc::Sender};
 use tokio_util::sync::CancellationToken;
+use tracing::{info, instrument};
 
-use crate::ui::components::issue_detail::{IssuePreviewSeed, PrSummary};
+use crate::ui::components::{
+    issue_conversation::{CommentView, IssueConversationSeed},
+    issue_detail::{IssuePreviewSeed, PrSummary},
+};
 
 const TICK_RATE: std::time::Duration = std::time::Duration::from_millis(100);
 const FPS: usize = 60;
@@ -87,7 +92,9 @@ impl AppState {
 fn focus(state: &mut App) -> &mut Focus {
     let mut f = FocusBuilder::new(state.focus.take());
     for component in state.components.iter() {
-        f.widget(component.as_ref());
+        if component.should_render() {
+            f.widget(component.as_ref());
+        }
     }
     state.focus = Some(f.build());
     state.focus.as_mut().unwrap()
@@ -103,6 +110,7 @@ impl App {
         let status_bar = StatusBar::new(state.clone());
         let label_list = LabelList::new(state.clone());
         let issue_preview = IssuePreview::new(state.clone());
+        let issue_conversation = IssueConversation::new(state.clone());
         let issue_handler = GITHUB_CLIENT
             .get()
             .unwrap()
@@ -117,6 +125,7 @@ impl App {
             cancel_action: Default::default(),
             components: vec![
                 Box::new(issue_list),
+                Box::new(issue_conversation),
                 Box::new(label_list),
                 Box::new(issue_preview),
                 Box::new(text_search), // This should be the last component so that the popup area is rendered properly
@@ -176,8 +185,10 @@ impl App {
                     terminal.draw(|f| {
                         let layout = layout::Layout::new(f.area());
                         for component in self.components.iter() {
-                            if let Some(p) = component.cursor() {
-                                f.set_cursor_position(p);
+                            if component.should_render() {
+                                if let Some(p) = component.cursor() {
+                                    f.set_cursor_position(p);
+                                }
                             }
                         }
                         let buf = f.buffer_mut();
@@ -189,7 +200,9 @@ impl App {
                             w.render(area, buf);
                         }
                         for component in self.components.iter_mut() {
-                            component.render(layout, buf);
+                            if component.should_render() {
+                                component.render(layout, buf);
+                            }
                         }
                         for component in self.dumb_components.iter_mut() {
                             component.render(layout, buf);
@@ -197,6 +210,11 @@ impl App {
                     })?;
                 }
                 Some(Action::Render) => {}
+                Some(Action::ForceFocusChange) => {
+                    let focus = focus(self);
+                    let r = focus.next_force();
+                    info!(outcome = ?r, "Focus");
+                }
                 Some(Action::AppEvent(event)) => {
                     self.handle_event(event).await?;
                 }
@@ -213,10 +231,18 @@ impl App {
 
         Ok(())
     }
+    #[instrument(skip(self))]
     async fn handle_event(&mut self, event: crossterm::event::Event) -> Result<(), AppError> {
+        let _capture_focus = self
+            .components
+            .iter()
+            .any(|c| c.should_render() && c.capture_focus_event(&event));
         let focus = focus(self);
-        focus.handle(&event, Regular);
-        if let crossterm::event::Event::Key(key) = event {
+        let outcome = focus.handle(&event, Regular);
+        info!(outcome = ?outcome, "Focus");
+        if let Outcome::Continue = outcome
+            && let crossterm::event::Event::Key(key) = event
+        {
             self.handle_key(key).await?;
         }
         Ok(())
@@ -257,6 +283,25 @@ pub enum Action {
         number: u64,
         message: String,
     },
+    EnterIssueDetails {
+        seed: IssueConversationSeed,
+    },
+    IssueCommentsLoaded {
+        number: u64,
+        comments: Vec<CommentView>,
+    },
+    IssueCommentPosted {
+        number: u64,
+        comment: CommentView,
+    },
+    IssueCommentsError {
+        number: u64,
+        message: String,
+    },
+    IssueCommentPostError {
+        number: u64,
+        message: String,
+    },
     IssueLabelsUpdated {
         number: u64,
         labels: Vec<Label>,
@@ -269,6 +314,7 @@ pub enum Action {
     },
     ChangeIssueScreen(MainScreen),
     FinishedLoading,
+    ForceFocusChange,
 }
 
 pub mod components;

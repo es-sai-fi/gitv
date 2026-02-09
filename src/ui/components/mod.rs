@@ -3,7 +3,9 @@ use rat_widget::focus::HasFocus;
 use ratatui::buffer::Buffer;
 
 use crate::ui::{Action, layout::Layout};
+use ratatui::crossterm::event::Event;
 
+pub mod issue_conversation;
 pub mod issue_detail;
 pub mod issue_list;
 pub mod label_filter;
@@ -29,5 +31,8 @@ pub trait Component: HasFocus {
     }
     fn should_render(&self) -> bool {
         true
+    }
+    fn capture_focus_event(&self, _event: &Event) -> bool {
+        false
     }
 }

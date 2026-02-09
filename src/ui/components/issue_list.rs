@@ -3,7 +3,9 @@ use crate::{
     errors::AppError,
     ui::{
         Action,
-        components::{Component, issue_detail::IssuePreviewSeed},
+        components::{
+            Component, issue_conversation::IssueConversationSeed, issue_detail::IssuePreviewSeed,
+        },
         layout::Layout,
         utils::get_border_style,
     },
@@ -14,7 +16,11 @@ use octocrab::{
     issues::IssueHandler,
     models::{IssueState, issues::Issue},
 };
-use rat_widget::{event::HandleEvent, focus::HasFocus, list::selection::RowSelection};
+use rat_widget::{
+    event::HandleEvent,
+    focus::{HasFocus, Navigation},
+    list::selection::RowSelection,
+};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -59,7 +65,7 @@ impl<'a> IssueList<'a> {
         tx: tokio::sync::mpsc::Sender<Action>,
     ) -> Self {
         tokio::spawn(async move {
-            let p = GITHUB_CLIENT
+            let Ok(p) = GITHUB_CLIENT
                 .get()
                 .unwrap()
                 .inner()
@@ -69,7 +75,9 @@ impl<'a> IssueList<'a> {
                 .per_page(10u8)
                 .send()
                 .await
-                .unwrap();
+            else {
+                return;
+            };
             tx.send(Action::NewPage(Box::new(p))).await.unwrap();
         });
         Self {
@@ -182,6 +190,31 @@ impl Component for IssueList<'_> {
                 }
             }
             crate::ui::Action::AppEvent(ref event) => {
+                if self.screen != MainScreen::List {
+                    return;
+                }
+                if let crossterm::event::Event::Key(key) = event {
+                    if key.code == crossterm::event::KeyCode::Enter {
+                        if let Some(selected) = self.list_state.selected_checked() {
+                            let issue = &self.issues[selected].0;
+                            self.action_tx
+                                .as_ref()
+                                .unwrap()
+                                .send(crate::ui::Action::EnterIssueDetails {
+                                    seed: IssueConversationSeed::from_issue(issue),
+                                })
+                                .await
+                                .unwrap();
+                            self.action_tx
+                                .as_ref()
+                                .unwrap()
+                                .send(crate::ui::Action::ChangeIssueScreen(MainScreen::Details))
+                                .await
+                                .unwrap();
+                        }
+                        return;
+                    }
+                }
                 if let rat_widget::event::Outcome::Changed =
                     self.list_state.handle(event, rat_widget::event::Regular)
                 {
@@ -249,6 +282,12 @@ impl Component for IssueList<'_> {
                     issue.0.labels = labels;
                 }
             }
+            crate::ui::Action::ChangeIssueScreen(screen) => {
+                self.screen = screen;
+                if screen == MainScreen::List {
+                    self.list_state.focus.set(true);
+                }
+            }
             _ => {}
         }
     }
@@ -269,5 +308,13 @@ impl HasFocus for IssueList<'_> {
     }
     fn focus(&self) -> rat_widget::focus::FocusFlag {
         self.list_state.focus()
+    }
+
+    fn navigable(&self) -> Navigation {
+        if self.screen == MainScreen::List {
+            Navigation::Regular
+        } else {
+            Navigation::None
+        }
     }
 }
