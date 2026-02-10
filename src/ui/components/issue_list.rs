@@ -16,9 +16,8 @@ use octocrab::{
     issues::IssueHandler,
     models::{IssueState, issues::Issue},
 };
-use std::sync::Arc;
 use rat_widget::{
-    event::HandleEvent,
+    event::{HandleEvent, ct_event},
     focus::{HasFocus, Navigation},
     list::selection::RowSelection,
 };
@@ -30,6 +29,7 @@ use ratatui::{
     widgets::{Block, ListItem, Padding, StatefulWidget},
 };
 use ratatui_macros::{line, span};
+use std::sync::Arc;
 use textwrap::{Options, wrap};
 use throbber_widgets_tui::ThrobberState;
 use tracing::info;
@@ -194,28 +194,27 @@ impl Component for IssueList<'_> {
                 if self.screen != MainScreen::List {
                     return;
                 }
-                if let crossterm::event::Event::Key(key) = event {
-                    if key.code == crossterm::event::KeyCode::Enter {
-                        if let Some(selected) = self.list_state.selected_checked() {
-                            let issue = &self.issues[selected].0;
-                            self.action_tx
-                                .as_ref()
-                                .unwrap()
-                                .send(crate::ui::Action::EnterIssueDetails {
-                                    seed: IssueConversationSeed::from_issue(issue),
-                                })
-                                .await
-                                .unwrap();
-                            self.action_tx
-                                .as_ref()
-                                .unwrap()
-                                .send(crate::ui::Action::ChangeIssueScreen(MainScreen::Details))
-                                .await
-                                .unwrap();
-                        }
-                        return;
+                if matches!(event, ct_event!(keycode press Enter)) {
+                    if let Some(selected) = self.list_state.selected_checked() {
+                        let issue = &self.issues[selected].0;
+                        self.action_tx
+                            .as_ref()
+                            .unwrap()
+                            .send(crate::ui::Action::EnterIssueDetails {
+                                seed: IssueConversationSeed::from_issue(issue),
+                            })
+                            .await
+                            .unwrap();
+                        self.action_tx
+                            .as_ref()
+                            .unwrap()
+                            .send(crate::ui::Action::ChangeIssueScreen(MainScreen::Details))
+                            .await
+                            .unwrap();
                     }
+                    return;
                 }
+
                 if let rat_widget::event::Outcome::Changed =
                     self.list_state.handle(event, rat_widget::event::Regular)
                 {
