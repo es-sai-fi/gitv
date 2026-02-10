@@ -188,11 +188,8 @@ impl Component for IssuePreview {
     }
 
     async fn handle_event(&mut self, event: Action) {
-        match event {
-            Action::SelectedIssuePreview { seed } => {
-                self.current = Some(seed);
-            }
-            _ => {}
+        if let Action::SelectedIssuePreview { seed } = event {
+            self.current = Some(seed);
         }
     }
 }

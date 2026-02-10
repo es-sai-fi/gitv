@@ -26,7 +26,7 @@ use rat_widget::{
     event::{HandleEvent, Outcome, Regular},
     focus::{Focus, FocusBuilder},
 };
-use ratatui::{crossterm, prelude::*, widgets::Block};
+use ratatui::{crossterm, prelude::*};
 use termprofile::{DetectorSettings, TermProfile};
 use tokio::{select, sync::mpsc::Sender};
 use tokio_util::sync::CancellationToken;
@@ -213,7 +213,7 @@ impl App {
         let capture_focus = self
             .components
             .iter()
-            .any(|c| c.should_render() && c.capture_focus_event(&event));
+            .any(|c| c.should_render() && c.capture_focus_event(event));
         let focus = focus(self);
         let outcome = focus.handle(event, Regular);
         info!(outcome = ?outcome, "Focus");
@@ -226,11 +226,8 @@ impl App {
         Ok(())
     }
     async fn handle_key(&mut self, key: &crossterm::event::KeyEvent) -> Result<(), AppError> {
-        match key.code {
-            crossterm::event::KeyCode::Char('q') => {
-                self.cancel_action.cancel();
-            }
-            _ => {}
+        if matches!(key.code, crossterm::event::KeyCode::Char('q')) {
+            self.cancel_action.cancel();
         }
 
         Ok(())
@@ -257,7 +254,6 @@ impl App {
             }
             let buf = f.buffer_mut();
 
-            let areas = layout.areas();
             for component in self.components.iter_mut() {
                 if component.should_render() {
                     component.render(layout, buf);

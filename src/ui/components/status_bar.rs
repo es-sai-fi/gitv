@@ -1,6 +1,6 @@
-use rat_widget::statusline_stacked::{SLANT_BL_TR, SLANT_TL_BR, StatusLineStacked};
+use rat_widget::statusline_stacked::StatusLineStacked;
 use ratatui::buffer::Buffer;
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::widgets::Widget;
 use ratatui_macros::span;
 use std::sync::atomic::Ordering;
