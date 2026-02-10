@@ -66,19 +66,26 @@ impl<'a> IssueList<'a> {
         tx: tokio::sync::mpsc::Sender<Action>,
     ) -> Self {
         tokio::spawn(async move {
-            let Ok(p) = GITHUB_CLIENT
+            let Ok(mut p) = GITHUB_CLIENT
                 .get()
                 .unwrap()
                 .inner()
                 .issues(owner, repo)
                 .list()
                 .page(1_u32)
-                .per_page(10u8)
+                .per_page(15u8)
                 .send()
                 .await
             else {
                 return;
             };
+            let items = std::mem::take(&mut p.items);
+            let items = items
+                .into_iter()
+                .filter(|i| i.pull_request.is_none())
+                .collect();
+            p.items = items;
+
             tx.send(Action::NewPage(Arc::new(p))).await.unwrap();
         });
         Self {
@@ -234,8 +241,14 @@ impl Component for IssueList<'_> {
                                     .get_page::<Issue>(&page_next)
                                     .await;
                                 if let Ok(pres) = p
-                                    && let Some(p) = pres
+                                    && let Some(mut p) = pres
                                 {
+                                    let items = std::mem::take(&mut p.items);
+                                    let items = items
+                                        .into_iter()
+                                        .filter(|i| i.pull_request.is_none())
+                                        .collect();
+                                    p.items = items;
                                     tx.send(crate::ui::Action::NewPage(Arc::new(p))).await?;
                                 }
                                 tx.send(crate::ui::Action::FinishedLoading).await.unwrap();
@@ -264,7 +277,7 @@ impl Component for IssueList<'_> {
                     }
                 }
             }
-            crate::ui::Action::NewPage(p) => {
+            crate::ui::Action::NewPage(mut p) => {
                 info!("New Page with {} issues", p.items.len());
                 self.issues
                     .extend(p.items.iter().cloned().map(IssueListItem::from));
