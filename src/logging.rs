@@ -22,7 +22,7 @@ pub static DATA_FOLDER: LazyLock<Option<PathBuf>> = LazyLock::new(|| {
 pub static LOG_ENV: LazyLock<String> = LazyLock::new(|| format!("{}_LOG_LEVEL", &*PROJECT_NAME));
 pub static LOG_FILE: LazyLock<String> = LazyLock::new(|| format!("{}.log", env!("CARGO_PKG_NAME")));
 
-pub(crate) fn get_data_dir() -> PathBuf {
+pub fn get_data_dir() -> PathBuf {
     if let Some(s) = DATA_FOLDER.clone() {
         s
     } else if let Some(proj_dirs) = project_directory() {

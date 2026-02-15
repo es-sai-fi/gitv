@@ -1,7 +1,24 @@
-use issue_me::{app::App, errors::AppError};
+use clap::Parser;
+use issue_me::{
+    app::{App, cli::Cli},
+    auth::AuthProvider,
+    errors::AppError,
+    logging,
+};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<(), AppError> {
-    let mut app = App::new().await?;
+    let cli = Cli::parse();
+    if cli.args.print_log_dir {
+        println!("Log directory: {}", logging::get_data_dir().display());
+        return Ok(());
+    }
+    if let Some(ref token) = cli.args.set_token {
+        let auth = issue_me::auth::keyring::KeyringAuth::new("issue_me")?;
+        auth.set_token(token)?;
+        return Ok(());
+    }
+
+    let mut app = App::new(cli).await?;
     app.run().await
 }
