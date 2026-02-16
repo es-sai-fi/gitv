@@ -134,7 +134,7 @@ pub fn version() -> String {
         "\
 {VERSION_MESSAGE}
 
-Authors: {author}
+Author: {author}
 
 Data directory: {data_dir_path}"
     )
