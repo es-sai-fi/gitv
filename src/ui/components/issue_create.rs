@@ -485,6 +485,14 @@ impl Component for IssueCreate {
         {
             return false;
         }
+        if self.body_state.is_focused()
+            && !matches!(
+                event,
+                ct_event!(keycode press Tab) | ct_event!(keycode press SHIFT-Tab)
+            )
+        {
+            return true;
+        }
         match event {
             event::Event::Key(key) => matches!(
                 key.code,
