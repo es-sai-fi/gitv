@@ -14,7 +14,7 @@
 - View issue conversations, including parsed markdown content
 - Full support for adding and removing reactions
 - Regex search for labels, plus the ability to create, edit, add, and remove labels from issues
-- Commenting on issues, with support for markdown formatting
+- Commenting on issues, with support for markdown formatting and quoting comments
 - Editing comments
 - Closing issues
 - Assigning and unassigning issues to users
@@ -50,7 +50,7 @@ Coming Soon!
 ### Usage
 
 ```
-Usage: main [OPTIONS] [OWNER] [REPO]
+Usage: gitv [OPTIONS] [OWNER] [REPO]
 
 Arguments:
   [OWNER]
@@ -79,6 +79,9 @@ Options:
           Stores/updates the GitHub token in the configured credential store.
 
           When provided, this command updates the saved token value.
+
+      --generate-man
+          Generate man pages using clap-mangen and exit
 
   -h, --help
           Print help (see a summary with '-h')
