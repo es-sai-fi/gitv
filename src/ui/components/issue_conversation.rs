@@ -48,10 +48,10 @@ use crate::{
         },
         layout::Layout,
         utils::get_border_style,
-        widgets::link::Link,
     },
 };
 use anyhow::anyhow;
+use hyperrat::Link;
 
 pub const HELP: &[HelpElementKind] = &[
     crate::help_text!("Issue Conversation Help"),

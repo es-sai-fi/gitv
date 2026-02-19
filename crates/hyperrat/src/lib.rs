@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use ratatui::{
+use ratatui_core::{
     buffer::Buffer,
     layout::{Position, Rect},
     style::{Modifier, Style},
@@ -8,6 +8,9 @@ use ratatui::{
 };
 use textwrap::core::display_width;
 
+/// Creates an OSC 8 hyperlink widget that renders the given label and URL when supported by the terminal, and falls back to plain text otherwise.
+///
+/// We make this work with ratatui's cell-based rendering with some cell skipping and careful label truncation. If the link is focused but hover styles aren't provided, it will fall back to bolding the label.
 #[derive(Debug, Clone)]
 pub struct Link<'a> {
     label: Cow<'a, str>,
@@ -20,6 +23,7 @@ pub struct Link<'a> {
 }
 
 impl<'a> Link<'a> {
+    /// Creates a new Link widget with the given label and URL. The label is what will be displayed to the user, while the URL is the target of the hyperlink
     pub fn new<L, U>(label: L, url: U) -> Self
     where
         L: Into<Cow<'a, str>>,
@@ -29,7 +33,7 @@ impl<'a> Link<'a> {
             label: label.into(),
             url: url.into(),
             style: Style::default()
-                .fg(ratatui::style::Color::Blue)
+                .fg(ratatui_core::style::Color::Blue)
                 .add_modifier(Modifier::UNDERLINED),
             hover_style: None,
             fallback_suffix: None,
@@ -38,16 +42,19 @@ impl<'a> Link<'a> {
         }
     }
 
+    /// Sets the base style for the link label when rendered. By default, this is blue and underlined, but you can customize it as needed.
     pub fn style(mut self, style: Style) -> Self {
         self.style = style;
         self
     }
 
+    /// Sets an optional hover style to apply to the link label when the link is focused. If not provided, the link will simply be bolded when focused.
     pub fn hover_style(mut self, style: Style) -> Self {
         self.hover_style = Some(style);
         self
     }
 
+    /// Sets an optional suffix to append to the label when the rendered label is truncated to fit the available width. This can be used to provide additional context about the link target even when truncation occurs, such as showing a domain name or file extension.
     pub fn fallback_suffix<S>(mut self, suffix: S) -> Self
     where
         S: Into<Cow<'a, str>>,
@@ -56,11 +63,13 @@ impl<'a> Link<'a> {
         self
     }
 
+    /// Enables or disables hyperlink rendering. When disabled, the widget will render the label as plain text without any hyperlink functionality. This can be useful in contexts where hyperlinks are not supported or desired.
     pub fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
 
+    /// Sets the focused state of the link, which controls whether hover styles are applied. This is typically managed by the parent widget or application based on user interaction.
     pub fn focused(mut self, focused: bool) -> Self {
         self.focused = focused;
         self
@@ -204,26 +213,13 @@ fn osc8_supported() -> bool {
         return false;
     }
 
-    if let Ok(value) = std::env::var("ISSUE_ME_DISABLE_HYPERLINKS")
-        && is_truthy(&value)
-    {
-        return false;
-    }
-
     true
-}
-
-fn is_truthy(value: &str) -> bool {
-    matches!(
-        value.trim().to_ascii_lowercase().as_str(),
-        "1" | "true" | "yes" | "on"
-    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ratatui::layout::Rect;
+    use ratatui_core::layout::Rect;
 
     #[test]
     fn renders_hyperlink_and_marks_skip_cells() {

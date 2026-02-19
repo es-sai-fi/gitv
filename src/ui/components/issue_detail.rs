@@ -14,8 +14,9 @@ use ratatui_macros::line;
 
 use crate::{
     errors::AppError,
-    ui::{Action, AppState, components::DumbComponent, layout::Layout, widgets::link::Link},
+    ui::{Action, AppState, components::DumbComponent, layout::Layout},
 };
+use hyperrat::Link;
 
 #[derive(Debug, Clone)]
 pub struct IssuePreviewSeed {

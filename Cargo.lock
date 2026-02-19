@@ -1211,6 +1211,7 @@ dependencies = [
  "directories",
  "edit",
  "futures",
+ "hyperrat",
  "inquire",
  "keyring",
  "octocrab",
@@ -2176,6 +2177,14 @@ dependencies = [
  "tokio",
  "tower-service",
  "tracing",
+]
+
+[[package]]
+name = "hyperrat"
+version = "0.1.0"
+dependencies = [
+ "ratatui-core",
+ "textwrap",
 ]
 
 [[package]]
