@@ -1,7 +1,15 @@
 [package]
 name = "hyperrat"
+description = "An OSC 8 link widget for ratatui that doesn't break your UI"
 version = "0.1.0"
 edition = "2024"
+authors = ["JayanAXHF <sunil.chdry@gmail.com>"]
+license = "Unlicense OR MIT"
+homepage = "https://github.com/jayanaxhf/gitv/crates/hyperrat"
+repository = "https://github.com/jayanaxhf/gitv/"
+readme = "README.md"
+keywords = ["tui", "cli", "ratatui"]
+categories = ["command-line-utilities", "command-line-interface"]
 
 [dependencies]
 ratatui-core = "0.1.0"
