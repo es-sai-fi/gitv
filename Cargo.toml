@@ -61,4 +61,4 @@ strip = true # Ensures debug symbols are removed.
 
 [build-dependencies]
 anyhow = "1.0.101"
-vergen-gix = { version = "9.1.0", features = ["build",] }
+vergen-gix = { version = "9.1.0", features = ["build", "cargo"] }

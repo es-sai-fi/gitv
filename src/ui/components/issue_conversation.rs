@@ -1501,6 +1501,7 @@ impl Component for IssueConversation {
                             tx.send(Action::ToastAction(ratatui_toaster::ToastMessage::Show {
                                 message: "Copied Link".to_string(),
                                 toast_type: ToastType::Success,
+
                                 position: ToastPosition::TopRight,
                             }))
                             .await?;

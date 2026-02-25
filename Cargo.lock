@@ -5038,7 +5038,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b849a1f6d8639e8de261e81ee0fc881e3e3620db1af9f2e0da015d4382ceaf75"
 dependencies = [
  "anyhow",
+ "cargo_metadata",
  "derive_builder",
+ "regex",
  "rustversion",
  "time",
  "vergen-lib",
